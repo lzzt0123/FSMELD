@@ -1,0 +1,10 @@
+/build*/
+/cmake-build-*/
+/.idea/
+/.vscode/
+*.log
+*.csv
+*.xlsx
+*.exe
+*.dll
+!lib/libfftw3-3.dll
