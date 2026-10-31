@@ -1,139 +1,129 @@
 # FSMELD
 
-FSMELD is a C++17 framework for time-series subsequence matching. It supports five elastic measures: DTW, ERP, EDR, LCSS, and MSM.
+FSMELD is a C++ framework for exact subsequence range search under elastic
+distance measures. Given a long time series, a query, and a distance cutoff,
+it finds the starting positions of matching subsequences. The query and each
+candidate window are z-normalized independently.
 
-## Overview
+FSMELD evaluates the inner-product lower bound `LB_IP` in batches using FFT.
+Candidates that survive this filter proceed to GLB filtering and exact
+elastic-distance verification. This `LB_IP -> GLB -> ELD` cascade reduces the
+number of expensive distance computations while preserving exact verification
+of the returned matches.
 
-Exact elastic distances are usually evaluated by dynamic programming and can
-require quadratic time for every candidate subsequence. This cost becomes the
-main bottleneck when a query must be compared with every sliding window of a
-long target series.
+[中文说明](README.zh-CN.md)
 
-FSMELD introduces an inner-product lower bound, denoted as `LBIP`. The bound
-separates target-side envelope morphology from query-side amplitude penalties
-and rewrites lower-bound evaluation as two sliding inner products. These inner
-products are evaluated in batches with FFT, reducing the amortized lower-bound
-cost to `O(log m)` per candidate, where `m` is the query length.
+## Features
 
-## Search pipeline
-
-For each target segment, FSMELD performs the following stages:
-
-1. Z-normalize the query and candidate subsequences.
-2. Construct upper and lower envelopes under window constraint `w`.
-3. Select upper and lower thresholds (`tU` and `tL`) for `LBIP`.
-4. Transform the two bound components into sliding inner products and evaluate
-   them with FFT.
-5. Prune candidates whose `LBIP` value exceeds the active search threshold.
-6. Apply the stronger BGLB filter to the remaining candidates.
-7. Evaluate the exact elastic distance for final verification.
-
-The implementation processes the target in FFT-friendly segments, avoiding an
-index-building stage and supporting direct search over raw time-series data.
-
-## Supported elastic measures
-
-| Metric                          | Tag    | Meaning of `arg`             |
-| ------------------------------- | ------ | ---------------------------- |
-| Dynamic Time Warping            | `dtw`  | Unused; pass `0`             |
-| Edit Distance with Real Penalty | `erp`  | Gap reference value `g`      |
-| Edit Distance on Real Sequences | `edr`  | Matching tolerance `epsilon` |
-| Longest Common Subsequence      | `lcss` | Matching tolerance `epsilon` |
-| Move-Split-Merge                | `msm`  | Split/merge cost `c`         |
-
-## Requirements
-
-- Windows 64-bit
-- CMake 3.16 or newer
-- A C++17 compiler (the included FFTW import library is tested with MinGW)
-- Ninja or another CMake-supported build system
-
-The repository includes the double-precision FFTW import library and runtime
-DLL in `lib/`.
+- `search`: FSMELD search with a fixed distance cutoff.
+- `cutoff`: determine the exact distance of the k-th nearest valid candidate.
+- `exact`: scan every valid candidate with the elastic-distance verifier.
+- DTW, squared-cost ERP, EDR, normalized LCSS distance, and MSM.
+- Per-window z-normalization, full blocks and tail windows, and invalid-window filtering.
 
 ## Build
 
-Using Ninja and MinGW:
+Requirements:
 
-```powershell
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build --target fsmeld
+- CMake 3.20 or later.
+- GCC/MinGW-w64 or Clang with C++17 and GNU variable-length-array extensions.
+  The numerical kernels use array extensions that MSVC does not support.
+- FFTW3 double-precision headers and library, installed separately.
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DFFTW3_ROOT=/path/to/fftw3
+cmake --build build --parallel
+./build/fsmeld --help
 ```
 
-The executable is generated as `build/fsmeld.exe`. CMake also copies the FFTW
-runtime DLL beside the executable.
+If FFTW3 is installed in a system search path, omit `FFTW3_ROOT`. Alternatively,
+set `FFTW3_INCLUDE_DIR` to the directory containing `fftw3.h` and
+`FFTW3_LIBRARY` to the double-precision library file.
 
-## Input files
+On Windows, run from a MinGW terminal with its compiler tools on `PATH`:
 
-- `BI_T`: target series stored as raw little-endian binary `double` values.
-- `Q`: query series stored as whitespace-separated text `double` values.
+```sh
+cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release -DFFTW3_ROOT=C:/fftw3
+cmake --build build --parallel
+build/fsmeld.exe --help
+```
 
-## Command line
+For a shared FFTW installation, put its DLL beside `fsmeld.exe` or make it
+available on `PATH`. Compiler runtime dependencies must also be available.
+
+## Input
+
+- `target.bin`: contiguous native-endian IEEE-754 64-bit floating-point values,
+  with no header. The extension does not determine the format.
+- `query.txt`: whitespace-separated numeric text. The first `m` values are used.
+- `m >= 2`; the target must contain at least `2*m-1` values.
+- `0 <= w < m`; the cutoff must be finite and non-negative.
+- Query and candidate windows are z-normalized independently. Invalid windows
+  containing non-finite input, non-finite standard deviation, or standard
+  deviation at most `1e-12` are skipped. An invalid query is rejected.
+
+Do not concatenate independent recordings unless windows crossing their
+boundaries are intended to be searched.
+
+## Commands
 
 ```text
-fsmeld BI_T Q type m epsilon metric w arg [top_k] [target_index] [exclude_start] [exclude_end]
+fsmeld search TARGET.bin QUERY.txt m cutoff metric w arg
+fsmeld cutoff TARGET.bin QUERY.txt m k      metric w arg
+fsmeld exact  TARGET.bin QUERY.txt m cutoff metric w arg
 ```
 
-| Argument  | Description                                                                  |
-| --------- | ---------------------------------------------------------------------------- |
-| `BI_T`    | Path to the binary target series                                             |
-| `Q`       | Path to the text query series                                                |
-| `type`    | Experiment or search mode listed below                                       |
-| `m`       | Query and candidate subsequence length                                       |
-| `epsilon` | Search threshold `xi`; this is separate from the EDR/LCSS tolerance in `arg` |
-| `metric`  | One of `dtw`, `erp`, `edr`, `lcss`, or `msm`                                 |
-| `w`       | Temporal constraint/envelope window size                                     |
-| `arg`     | Metric-specific parameter from the table above                               |
-| `top_k`   | Optional Top-K value; default is `10`                                        |
+| Metric | `arg` | Distance convention |
+|---|---|---|
+| `dtw` | ignored; use `0` | Square root of accumulated squared cost |
+| `erp` | gap value `g` | Square root of accumulated squared match/gap cost |
+| `edr` | non-negative match tolerance | Edit count |
+| `lcss` | non-negative match tolerance | `1 - LCSS/m` |
+| `msm` | non-negative move/split/merge cost `c` | Accumulated cost |
 
-Optional arguments are positional. To provide `target_index`, first provide a
-value for `top_k`.
+### Example workflow
 
-### Modes
+For a query of length 128, the following example uses ERP with `g=0` and a
+temporal constraint of `w=6`:
 
-| Type | Operation                                                         |
-| ---- | ----------------------------------------------------------------- |
-| `1`  | Compute `LBIP / ELD` tightness over all valid target windows      |
-| `2`  | Compute the exact Top-K elastic-distance threshold                |
-| `3`  | Run the complete `LBIP -> BGLB -> exact distance` FSMELD pipeline |
-| `4`  | Run the ablation pipeline `BGLB -> exact distance` without `LBIP` |
-| `6`  | Run FSMELD while dynamically shrinking the Top-K threshold        |
-| `8`  | Scan exact elastic distances without lower-bound filtering        |
+```sh
+# Determine the rank-10 cutoff for ERP.
+./build/fsmeld cutoff target.bin query.txt 128 10 erp 6 0
 
-Run `fsmeld --help` to display the same interface from the executable.
+# Use the reported Final Top-K Threshold as the search cutoff.
+# Replace 0.75 with the reported cutoff or your chosen search cutoff.
+./build/fsmeld search target.bin query.txt 128 0.75 erp 6 0
 
-### Example
-
-The following command runs complete ERP search with `m = 1024`, `w = 102`,
-search threshold `0.5`, and ERP gap value `g = 0`:
-
-```powershell
-.\build\fsmeld.exe target_double.bin query.txt 3 1024 0.5 erp 102 0
+# Scan all candidates directly at the same cutoff.
+./build/fsmeld exact target.bin query.txt 128 0.75 erp 6 0
 ```
 
-To calculate TLB values for EDR:
+`cutoff` reports the k-th smallest exact distance; tied candidates can make a
+range search at that cutoff return more than k matches. It fails when fewer
+than k valid candidates exist. `search` and `exact` retain only
+computed exact distances `<= cutoff`.
 
-```powershell
-.\build\fsmeld.exe target_double.bin query.txt 1 1024 1.0 edr 102 0.1
-```
+## Output
 
-## Experimental configuration in the paper
+- Match lines: `A[0] = ...`, `A[1] = ...`, giving candidate starting positions.
+- `cutoff` prints `Final Top-K Threshold` and ranked candidate indices.
+- Search runs print counts, timings, and a CSV summary, and append to
+  `experiment_results.csv` in the working directory.
+- Set `FSMELD_RESULTS_CSV` to choose a different CSV destination.
+- Set `FSMELD_QUIET_MATCHES=1` to omit individual match lines.
 
-The paper evaluates ECG, TEMP, RANDOMWALK, THCHS, PLA, and PLETH datasets with:
-
-- query lengths `m` in `{128, 256, 512, 1024, 2048, 4096}`;
-- window ratios `w/m` in `{0.01, 0.02, 0.05, 0.10}`;
-- DTW, ERP, EDR, LCSS, and MSM;
-
-TLB is defined as `LBIP(X, Q) / ELD(X, Q)`, where a value closer to `1` denotes
-a tighter lower bound. 
+The macro-segment length is `2^ceil(log2(8*m))`, as in the paper. It is
+shortened to the target length when the target is smaller than one segment.
 
 ## Source layout
 
-- `FSMELD.cpp`: search, TLB, Top-K, and ablation pipelines.
-- `find_t_lp.cpp`: threshold selection for the upper and lower bound components.
-- `q_to_h.cpp`, `lb.cpp`, `sip.cpp`: inner-product transformations and FFT-based
-  sliding inner products.
-- `glb.cpp`: BGLB filters and metric dispatch.
-- `ElasticMeasures.cpp`: exact elastic-distance implementations.
-- `lower_upper_lemire.cpp`: linear-time envelope construction.
+- `src/fsmeld.cpp`: normalized search, Top-K cutoff computation, exact scan,
+  shared candidate validation, and tail handling.
+- `src/find_t_lp.cpp`: heuristic upper/lower threshold selection.
+- `src/lb.cpp`, `src/q_to_h.cpp`, `src/lb_normalize.cpp`: masks, penalties,
+  and normalized envelopes.
+- `src/sip.cpp`: FFT sliding-inner-product primitives.
+- `src/glb.cpp`: GLB second-stage filter.
+- `src/ElasticMeasures.cpp`: elastic-distance dynamic programming.
+- Remaining source files provide envelopes, normalization, reporting, and CLI.
+

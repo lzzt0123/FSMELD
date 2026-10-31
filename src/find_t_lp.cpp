@@ -1,6 +1,6 @@
-
-
-
+//
+// Created by LZT on 2025-08-07.
+//
 #include <cstdio>
 #include <stdlib.h>
 #include "funcs.h"
@@ -13,16 +13,14 @@
 
 using namespace std;
 
-
-
-
-
-
-
-
-
-
-
+// struct HeapItem {
+//     double value;
+//     int index;
+//
+//     bool operator<(const HeapItem& other) const {
+//         return value > other.value;
+//     }
+// };
 
 struct HeapItem {
     double value;
@@ -32,7 +30,6 @@ struct HeapItem {
         return value > other.value;
     }
 };
-
 
 struct maxHeapItem {
     double value;
@@ -52,7 +49,6 @@ struct UniqueItem {
         return value < other.value;
     }
 };
-
 
 int create_unique_struct_array(double *T, UniqueItem *output, int m,int n) {
     if (n <= 0) return 0;
@@ -84,15 +80,13 @@ void get_sorted_struct_array(UniqueItem *T_sort, int n, int isupper) {
     }
 }
 
-
 void get_sorted_array(double* T_sort, int n, int isupper) {
 
     if (isupper == 1) {
         
         std::sort(T_sort, T_sort + n);
     } else {
-        
-        
+
         std::sort(T_sort, T_sort + n, std::greater<double>());
     }
 }
@@ -112,8 +106,7 @@ int create_unique_array(double *T, double *T_remove, int *counts, int n) {
             j++;                
         }
         else {
-            
-            
+
             counts[j-1]++;
         }
     }
@@ -143,7 +136,6 @@ void sort_parallel_arrays(double* values, int* counts, int n) {
         temp_counts[i] = counts[original_index];
     }
 
-    
     for (int i = 0; i < n; ++i) {
         values[i] = temp_values[i];
         counts[i] = temp_counts[i];
@@ -166,12 +158,18 @@ double D(double q_i,double C,const char *tag) {
     return 0.0;
 }
 
+double D(double q_i,double C,const char *tag,double p) {
+    if(strcmp(tag,"swale")==0) {
+        return p;
+    }
+    return D(q_i, C, tag);
+}
 double t_u(double q_i,double C,const char *tag) {
     if(strcmp(tag,"msm")==0){
         return q_i-C;
     }else if(strcmp(tag,"erp")==0) {
         return q_i-abs(q_i-C);
-    }else if (strcmp(tag,"edr")==0||strcmp(tag,"lcss")==0) {
+    }else if (strcmp(tag,"edr")==0||strcmp(tag,"lcss")==0||strcmp(tag,"swale")==0) {
         return q_i-C;
     }
     return q_i;
@@ -181,7 +179,7 @@ double t_l(double q_i,double C,const char *tag) {
         return q_i+C;
     }else if(strcmp(tag,"erp")==0) {
         return q_i+abs(q_i-C);
-    }else if (strcmp(tag,"edr")==0||strcmp(tag,"lcss")==0) {
+    }else if (strcmp(tag,"edr")==0||strcmp(tag,"lcss")==0||strcmp(tag,"swale")==0) {
         return q_i+C;
     }
     return q_i;
@@ -198,6 +196,12 @@ double f_p(double *m_p, int p, const char *tag, double t) {
         return m_p[2]-m_p[1]*t*2+m_p[0]*pow(t,2);
     }
     return 0.0;
+}
+double f_p(double *m_p, int p, const char *tag,double t,double swale_r) {
+    if(strcmp(tag,"swale")==0) {
+       return m_p[0]*swale_r;
+    }
+    return f_p(m_p, p, tag, t);
 }
 int findMaxIndex(const double *arr, int size) {
     if (size <= 0) return -1;  
@@ -224,13 +228,11 @@ double find_tl_lp_dtw(double *L, int l, double *q, int m, int p, double *LB, dou
 
     n_remove = create_unique_struct_array(L, L_remove, m, l - 2 * m + 2);
 
-    
     get_sorted_struct_array(L_remove, n_remove, 0);
 
     g_L = 0;
     t_0 = L_remove[0].value;
 
-    
     double* q_copy_owned = nullptr;
     const double* q_copy = q_sorted;
     if (q_copy == nullptr) {
@@ -242,32 +244,23 @@ double find_tl_lp_dtw(double *L, int l, double *q, int m, int p, double *LB, dou
 
     int idx1 = m - 1;
 
-    
-    
-    
     while (idx1 >= 0 && q_copy[idx1] >= t_0) {
         idx1--;
     }
 
-    
-    
     for (int i = 0; i <= idx1; i++) {
         for (int a = 0; a < p + 1; a++) {
             m_p[a] += std::pow(q_copy[i], a);
         }
     }
 
-    
     for (int i = 0; i < n_remove; i++) {
         double t = L_remove[i].value;
         g_L = g_L + L_remove[i].count;
 
-        
-        
         while (idx1 >= 0) {
             double val = q_copy[idx1];
 
-            
             if (val >= t) {
                 for (int a = 0; a < p + 1; a++) {
                     m_p[a] -= std::pow(val, a);
@@ -279,7 +272,6 @@ double find_tl_lp_dtw(double *L, int l, double *q, int m, int p, double *LB, dou
             }
         }
 
-        
         h_L = std::abs(f_p(m_p, p, tag, t));
         LB[i] = h_L * g_L;
     }
@@ -287,11 +279,10 @@ double find_tl_lp_dtw(double *L, int l, double *q, int m, int p, double *LB, dou
     int index = findMaxIndex(LB, n_remove);
     tl = L_remove[index].value;
 
-    
     delete[] q_copy_owned;
     delete[] L_remove;
 
-    
+    // printf("tl=%lf\n", tl);
     return tl;
 }
 double find_tl_lp(double *L,int l,double *q,int m,int p,double C_,double *LB,double *m_p,const char* tag,const double* q_sorted){
@@ -300,7 +291,6 @@ double find_tl_lp(double *L,int l,double *q,int m,int p,double C_,double *LB,dou
     int g_L;
     double t_0;
 
-    
     int n_remove;
 
     memset(m_p, 0, sizeof(double) * (p + 1));
@@ -312,14 +302,13 @@ double find_tl_lp(double *L,int l,double *q,int m,int p,double C_,double *LB,dou
 
     get_sorted_struct_array(L_remove,n_remove,0);
 
-
     g_L=0;
     C=0;
     t_0=L_remove[0].value;
 
-    
-    
-    
+    // Heap 2 (Small): [0, idx2]
+    // Heap 1 (Mid):   (idx2, idx1]
+    // Ignored (Big):  (idx1, m-1]
 
     int idx1 = m - 1;
     
@@ -336,10 +325,8 @@ double find_tl_lp(double *L,int l,double *q,int m,int p,double C_,double *LB,dou
         idx1--;
     }
 
-    
     int idx2 = idx1;
 
-    
     while (idx2 >= 0) {
         double val = t_l(q_copy[idx2],C_,tag);
 
@@ -350,13 +337,11 @@ double find_tl_lp(double *L,int l,double *q,int m,int p,double C_,double *LB,dou
             }
             idx2--;
         } else {
-            
-            
+
             break;
         }
     }
 
-    
     for (int j = 0; j <= idx2; j++) {
         C += D(q_copy[j], C_,tag);
     }
@@ -365,18 +350,13 @@ double find_tl_lp(double *L,int l,double *q,int m,int p,double C_,double *LB,dou
         double t = L_remove[i].value;
         g_L = g_L + L_remove[i].count;
 
-        
-        
-        
         while (idx2 >= 0) {
             double val = t_l(q_copy[idx2],C_,tag);
-            
-            
+
             if (val >= t) {
                 
                 C = C - D(q_copy[idx2], C_,tag);
 
-                
                 for (int a = 0; a < p + 1; a++) {
                     m_p[a] += std::pow(q_copy[idx2], a);
                 }
@@ -388,10 +368,6 @@ double find_tl_lp(double *L,int l,double *q,int m,int p,double C_,double *LB,dou
             }
         }
 
-        
-        
-        
-        
         while (idx1 > idx2) {
             double val = q_copy[idx1];
             if (val > t) {
@@ -407,7 +383,6 @@ double find_tl_lp(double *L,int l,double *q,int m,int p,double C_,double *LB,dou
             }
         }
 
-        
         h_L = C + std::abs(f_p(m_p, p, tag,t));
         LB[i] = h_L * g_L;
     }
@@ -418,7 +393,118 @@ double find_tl_lp(double *L,int l,double *q,int m,int p,double C_,double *LB,dou
     delete[] q_copy_owned;
 
     delete[] L_remove;
+    //printf("tl=%lf\n",tl);
+    return tl;
+}
+double find_tl_lp_swale(double *L,int l,double *q,int m,int p,double C_,double *LB,double *m_p,const char* tag,double swale_r,double swale_p,const double* q_sorted){
+
+    double tl=0.0,h_L=0.0,C;
+    int g_L;
+    double t_0;
+
+    int n_remove;
+
+    memset(m_p, 0, sizeof(double) * (p + 1));
+    memset(LB, 0, sizeof(double) * (l-2*m+2));
+
+    UniqueItem* L_remove = new UniqueItem[l-2*m+2];
+
+    n_remove=create_unique_struct_array(L,L_remove,m,l-2*m+2);
+
+    get_sorted_struct_array(L_remove,n_remove,0);
+
+    g_L=0;
+    C=0;
+    t_0=L_remove[0].value;
+
+    // Heap 2 (Small): [0, idx2]
+    // Heap 1 (Mid):   (idx2, idx1]
+    // Ignored (Big):  (idx1, m-1]
+
+    int idx1 = m - 1;
     
+    double* q_copy_owned = nullptr;
+    const double* q_copy = q_sorted;
+    if (q_copy == nullptr) {
+        q_copy_owned = new double[m];
+        std::memcpy(q_copy_owned, q, m * sizeof(double));
+        std::sort(q_copy_owned, q_copy_owned + m);
+        q_copy = q_copy_owned;
+    }
+
+    while (idx1 >= 0 && q_copy[idx1] >= t_0) {
+        idx1--;
+    }
+
+    int idx2 = idx1;
+
+    while (idx2 >= 0) {
+        double val = t_l(q_copy[idx2],C_,tag);
+
+        if (val >= t_0) {
+            
+            for (int a = 0; a < p + 1; a++) {
+                m_p[a] += std::pow(q_copy[idx2], a);
+            }
+            idx2--;
+        } else {
+
+            break;
+        }
+    }
+
+    for (int j = 0; j <= idx2; j++) {
+        C += D(q_copy[j], C_,tag,swale_p);
+    }
+
+    for (int i = 0; i < n_remove; i++) {
+        double t = L_remove[i].value;
+        g_L = g_L + L_remove[i].count;
+
+        while (idx2 >= 0) {
+            double val = t_l(q_copy[idx2],C_,tag);
+
+            if (val >= t) {
+                
+                C = C - D(q_copy[idx2], C_,tag,swale_p);
+
+                for (int a = 0; a < p + 1; a++) {
+                    m_p[a] += std::pow(q_copy[idx2], a);
+                }
+
+                idx2--;
+            } else {
+                
+                break;
+            }
+        }
+
+        while (idx1 > idx2) {
+            double val = q_copy[idx1];
+            if (val > t) {
+                
+                for (int a = 0; a < p + 1; a++) {
+                    m_p[a] -= std::pow(val, a);
+                }
+                
+                idx1--;
+            } else {
+                
+                break;
+            }
+        }
+
+        h_L = C + std::abs(f_p(m_p, p,tag, t,swale_r));
+        LB[i] = h_L * g_L;
+    }
+
+    int index = findMaxIndex(LB,n_remove);
+    tl=L_remove[index].value;
+    
+    delete[] q_copy_owned;
+
+    delete[] L_remove;
+    //printf("tl=%lf\n",tl);
     return tl;
 }
 double find_tl_lp_erp(double *L, int l, double *q, int m, int p, double C_, double *LB, double *m_p) {
@@ -439,7 +525,6 @@ double find_tl_lp_erp(double *L, int l, double *q, int m, int p, double C_, doub
     std::priority_queue<maxHeapItem> H2;
     std::priority_queue<maxHeapItem> H1;
 
-    
     for (int i = 0; i < m; i++) {
         double tau = t_l(q[i], C_, "erp");
 
@@ -458,12 +543,10 @@ double find_tl_lp_erp(double *L, int l, double *q, int m, int p, double C_, doub
         }
     }
 
-    
     for (int i = 0; i < n_remove; i++) {
         double t = L_remove[i].value;
         g_L = g_L + L_remove[i].count;
 
-        
         while (!H2.empty() && H2.top().value >= t) {
             int orig_idx = H2.top().index;
             double orig_q = q[orig_idx];
@@ -477,7 +560,6 @@ double find_tl_lp_erp(double *L, int l, double *q, int m, int p, double C_, doub
             }
         }
 
-        
         while (!H1.empty() && H1.top().value >= t) {
             int orig_idx = H1.top().index;
             double orig_q = q[orig_idx];
@@ -512,11 +594,9 @@ double find_tu_lp_erp(double *U, int l, double *q, int m, int p, double C_, doub
     get_sorted_struct_array(U_remove, n_remove, 1);
     t_0 = U_remove[0].value;
 
-    
     std::priority_queue<HeapItem> H2; 
     std::priority_queue<HeapItem> H1; 
 
-    
     for (int i = 0; i < m; i++) {
         double tau = t_u(q[i], C_, "erp");
 
@@ -535,12 +615,10 @@ double find_tu_lp_erp(double *U, int l, double *q, int m, int p, double C_, doub
         }
     }
 
-    
     for (int i = 0; i < n_remove; i++) {
         double t = U_remove[i].value;
         g_U = g_U + U_remove[i].count;
 
-        
         while (!H2.empty() && H2.top().value <= t) {
             int orig_idx = H2.top().index; 
             double orig_q = q[orig_idx];   
@@ -554,7 +632,6 @@ double find_tu_lp_erp(double *U, int l, double *q, int m, int p, double C_, doub
             }
         }
 
-        
         while (!H1.empty() && H1.top().value <= t) {
             int orig_idx = H1.top().index;
             double orig_q = q[orig_idx];
@@ -565,7 +642,6 @@ double find_tu_lp_erp(double *U, int l, double *q, int m, int p, double C_, doub
             }
         }
 
-        
         h_U = C + f_p(m_p, p, "erp", t);
         LB[i] = h_U * g_U;
     }
@@ -593,7 +669,6 @@ double find_tu_lp_dtw(double *U, int l, double *q, int m, int p, double *LB, dou
     g_U = 0;
     t_0 = U_remove[0].value;
 
-    
     double* q_copy_owned = nullptr;
     const double* q_copy = q_sorted;
     if (q_copy == nullptr) {
@@ -605,30 +680,23 @@ double find_tu_lp_dtw(double *U, int l, double *q, int m, int p, double *LB, dou
 
     int idx1 = 0;
 
-    
     while (idx1 < m && q_copy[idx1] <= t_0) {
         idx1++;
     }
 
-    
-    
     for (int i = idx1; i < m; i++) {
         for (int a = 0; a < p + 1; a++) {
             m_p[a] += std::pow(q_copy[i], a);
         }
     }
 
-    
     for (int i = 0; i < n_remove; i++) {
         double t = U_remove[i].value;
         g_U = g_U + U_remove[i].count;
 
-        
-        
         while (idx1 < m) {
             double val = q_copy[idx1];
 
-            
             if (val < t) {
                 
                 for (int a = 0; a < p + 1; a++) {
@@ -648,11 +716,10 @@ double find_tu_lp_dtw(double *U, int l, double *q, int m, int p, double *LB, dou
     int index = findMaxIndex(LB, n_remove);
     tu = U_remove[index].value;
 
-    
     delete[] q_copy_owned;
     delete[] U_remove;
 
-    
+    // printf("tu=%lf\n", tu);
     return tu;
 }
 
@@ -675,7 +742,6 @@ double find_tu_lp(double *U,int l,double *q,int m,int p,double C_,double *LB,dou
     C=0;
     t_0=U_remove[0].value;
 
-    
     double* q_copy_owned = nullptr;
     const double* q_copy = q_sorted;
     if (q_copy == nullptr) {
@@ -685,23 +751,19 @@ double find_tu_lp(double *U,int l,double *q,int m,int p,double C_,double *LB,dou
         q_copy = q_copy_owned;
     }
 
-
     int idx1 = 0; 
     int idx2 = 0; 
 
-    
     while (idx1 < m && q_copy[idx1] <= t_0) {
         idx1++;
     }
 
-    
     idx2 = idx1;
 
-    
     while (idx2 < m) {
         double val = t_u(q_copy[idx2],C_,tag);
         
-        
+        // val <= t_0 -> Heap 1
         if (val <= t_0) {
             for (int a = 0; a < p + 1; a++) {
                 m_p[a] += std::pow(q_copy[idx2], a);
@@ -713,8 +775,6 @@ double find_tu_lp(double *U,int l,double *q,int m,int p,double C_,double *LB,dou
         }
     }
 
-    
-    
     for (int j = idx2; j < m; j++) {
         C += D(q_copy[j], C_,tag);
     }
@@ -722,7 +782,6 @@ double find_tu_lp(double *U,int l,double *q,int m,int p,double C_,double *LB,dou
         double t = U_remove[i].value;
         g_U = g_U + U_remove[i].count;
 
-        
         while (idx2 < m) {
             double val = t_u(q_copy[idx2],C_,tag);
             
@@ -739,10 +798,6 @@ double find_tu_lp(double *U,int l,double *q,int m,int p,double C_,double *LB,dou
             }
         }
 
-        
-        
-        
-        
         while (idx1 < idx2) {
             double val = q_copy[idx1];
             
@@ -765,7 +820,108 @@ double find_tu_lp(double *U,int l,double *q,int m,int p,double C_,double *LB,dou
     
     delete[] q_copy_owned;
     delete[] U_remove;
-    
+    //printf("tu=%lf\n",tu);
     return tu;
 }
 
+double find_tu_lp_swale(double *U,int l,double *q,int m,int p,double C_,double *LB,double *m_p,const char* tag,double swale_r,double swale_p,const double* q_sorted) {
+    double tu=0.0,h_U=0.0,C;
+    int g_U;
+    double t_0;
+    int n_remove;
+
+    UniqueItem* U_remove = new UniqueItem[l-2*m+2];
+
+    memset(m_p, 0, sizeof(double) * (p + 1));
+    memset(LB, 0, sizeof(double) * (l-2*m+2));
+
+    n_remove=create_unique_struct_array(U,U_remove,m,l-2*m+2);
+
+    get_sorted_struct_array(U_remove,n_remove,1);
+
+    g_U=0;
+    C=0;
+    t_0=U_remove[0].value;
+
+    double* q_copy_owned = nullptr;
+    const double* q_copy = q_sorted;
+    if (q_copy == nullptr) {
+        q_copy_owned = new double[m];
+        std::memcpy(q_copy_owned, q, m * sizeof(double));
+        std::sort(q_copy_owned, q_copy_owned + m);
+        q_copy = q_copy_owned;
+    }
+
+    int idx1 = 0; 
+    int idx2 = 0; 
+
+    while (idx1 < m && q_copy[idx1] <= t_0) {
+        idx1++;
+    }
+
+    idx2 = idx1;
+
+    while (idx2 < m) {
+        double val = t_u(q_copy[idx2],C_,tag);
+        
+        // val <= t_0 -> Heap 1
+        if (val <= t_0) {
+            for (int a = 0; a < p + 1; a++) {
+                m_p[a] += std::pow(q_copy[idx2], a);
+            }
+            idx2++;
+        } else {
+            
+            break;
+        }
+    }
+
+    for (int j = idx2; j < m; j++) {
+        C += D(q_copy[j], C_,tag,swale_p);
+    }
+    for (int i = 0; i < n_remove; i++) {
+        double t = U_remove[i].value;
+        g_U = g_U + U_remove[i].count;
+
+        while (idx2 < m) {
+            //double val = q_copy[idx2];
+            double val = t_u(q_copy[idx2],C_,tag);
+            
+            if (val <= t ) {
+
+                C = C - D(val, C_,tag,swale_p);
+                for (int a = 0; a < p + 1; a++) {
+                    m_p[a] += std::pow(q_copy[idx2], a);
+                }
+                idx2++;
+            } else {
+                
+                break;
+            }
+        }
+
+        while (idx1 < idx2) {
+            double val = q_copy[idx1];
+            
+            if (val < t) {
+                for (int a = 0; a < p + 1; a++) {
+                    m_p[a] -= std::pow(val, a);
+                }
+                idx1++;
+            } else {
+                break;
+            }
+        }
+
+        h_U = C + f_p(m_p, p,tag, t,swale_r);
+        LB[i] = h_U * g_U;
+    }
+
+    int index = findMaxIndex(LB,n_remove);
+    tu=U_remove[index].value;
+    
+    delete[] q_copy_owned;
+    delete[] U_remove;
+    //printf("tu=%lf\n",tu);
+    return tu;
+}

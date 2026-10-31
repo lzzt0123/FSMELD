@@ -1,10 +1,10 @@
-
-
-
+//
+// Created by LZT on 2025-07-30.
+//
 #include "funcs.h"
 
 using namespace std;
-
+///Calculating the upper and lower envelopes using monotonic queues
 void lower_upper_lemire(double a[], int n, int r, double l[], double u[])
 {
     int l_index = 0;
@@ -42,7 +42,7 @@ void lower_upper_lemire(double a[], int n, int r, double l[], double u[])
     }
 
 }
-
+///Calculating the lower envelopes using monotonic queues
 void getmin(double a[], int n, int r, double l[])
 {
     int l_index = 0;
@@ -100,7 +100,6 @@ void min_max_window(double a[], int n, int m, double min_out[], double max_out[]
     int head_l = 0, tail_l = -1;
     int head_u = 0, tail_u = -1;
 
-
     for (int i = 0; i < k_m_l; i++) {
 
         while (head_l <= tail_l && a[q_l[tail_l]] >= a[i]) tail_l--;
@@ -115,7 +114,6 @@ void min_max_window(double a[], int n, int m, double min_out[], double max_out[]
         if (q_u[head_u] <= i - m) head_u++;
         max_out[i] = a[q_u[head_u]];
     }
-
 
     for (int i = k_m_l; i < n; i++) {
 

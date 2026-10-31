@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <math.h>
 
 #define MAX_VAL 1e18
@@ -163,7 +164,6 @@ double edr(double* x, int n, double* y, int m_size, double epsilon, int w) {
     return prev[m_size];
 }
 
-
 double msm(double* x, int xlen, double* y, int ylen, double c, int w) {
     static double* cost_buffer = nullptr;
     static size_t cost_capacity = 0;
@@ -197,3 +197,35 @@ double msm(double* x, int xlen, double* y, int ylen, double c, int w) {
     return res;
 }
 
+double swale(double* x, int m, double* y, int n, double p, double r_cost, double epsilon, int w) {
+    if (x == nullptr || y == nullptr || m <= 0 || n <= 0 || w < 0 ||
+        epsilon < 0.0 || r_cost < 0.0 || p < r_cost) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+    static double* dp_buffer = nullptr;
+    static size_t dp_capacity = 0;
+    double* dp = ensure_buffer(dp_buffer, dp_capacity, static_cast<size_t>(m + 1) * (n + 1));
+    for (int i = 0; i < (m + 1) * (n + 1); i++) dp[i] = MAX_VAL;
+
+    dp[0] = 0.0;
+    for (int j = 1; j <= MIN(n, w); ++j) {
+        dp[j] = dp[j - 1] + p;
+    }
+    for (int i = 1; i <= MIN(m, w); ++i) {
+        dp[i * (n + 1)] = dp[(i - 1) * (n + 1)] + p;
+    }
+    for (int i = 1; i <= m; ++i) {
+        int min_j = MAX(1, i - w);
+        int max_j = MIN(n, i + w);
+        for (int j = min_j; j <= max_j; ++j) {
+            double dist_val = std::abs(x[i - 1] - y[j - 1]);
+            double matchVal = (dist_val <= epsilon) ? r_cost : p;
+            double diag = dp[(i - 1) * (n + 1) + (j - 1)] + matchVal;
+            double up = dp[(i - 1) * (n + 1) + j] + p;
+            double left = dp[i * (n + 1) + (j - 1)] + p;
+            dp[i * (n + 1) + j] = std::min({diag, up, left});
+        }
+    }
+    double final_res = dp[(m + 1) * (n + 1) - 1];
+    return final_res;
+}
