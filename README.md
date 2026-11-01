@@ -11,8 +11,6 @@ elastic-distance verification. This `LB_IP -> GLB -> ELD` cascade reduces the
 number of expensive distance computations while preserving exact verification
 of the returned matches.
 
-[中文说明](README.zh-CN.md)
-
 ## Features
 
 - `search`: FSMELD search with a fixed distance cutoff.
@@ -73,13 +71,13 @@ fsmeld cutoff TARGET.bin QUERY.txt m k      metric w arg
 fsmeld exact  TARGET.bin QUERY.txt m cutoff metric w arg
 ```
 
-| Metric | `arg` | Distance convention |
-|---|---|---|
-| `dtw` | ignored; use `0` | Square root of accumulated squared cost |
-| `erp` | gap value `g` | Square root of accumulated squared match/gap cost |
-| `edr` | non-negative match tolerance | Edit count |
-| `lcss` | non-negative match tolerance | `1 - LCSS/m` |
-| `msm` | non-negative move/split/merge cost `c` | Accumulated cost |
+| Metric | `arg`                                  | Distance convention                               |
+| ------ | -------------------------------------- | ------------------------------------------------- |
+| `dtw`  | ignored; use `0`                       | Square root of accumulated squared cost           |
+| `erp`  | gap value `g`                          | Square root of accumulated squared match/gap cost |
+| `edr`  | non-negative match tolerance           | Edit count                                        |
+| `lcss` | non-negative match tolerance           | `1 - LCSS/m`                                      |
+| `msm`  | non-negative move/split/merge cost `c` | Accumulated cost                                  |
 
 ### Example workflow
 
@@ -126,4 +124,3 @@ shortened to the target length when the target is smaller than one segment.
 - `src/glb.cpp`: GLB second-stage filter.
 - `src/ElasticMeasures.cpp`: elastic-distance dynamic programming.
 - Remaining source files provide envelopes, normalization, reporting, and CLI.
-
